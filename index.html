@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROS2 Embedded Quest - Simulasi Instalasi ROS2 Ubuntu Server</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        ros: {
+                            red: '#E02227',
+                            darkred: '#9E1216',
+                            terminal: '#0d1117',
+                            border: '#30363d',
+                            accent: '#22c55e',
+                            blue: '#3b82f6'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar for terminal look */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0d1117;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #21262d;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #30363d;
+        }
+
+        .terminal-glow {
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.15);
+        }
+
+        .scanline {
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0, 0, 0, 0.3) 50%,
+                rgba(0, 0, 0, 0.3)
+            );
+            background-size: 100% 4px;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.9; }
+        }
+
+        .animate-pulse-glow {
+            animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes float-agv {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-6px); }
+        }
+
+        .animate-float {
+            animation: float-agv 3s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col justify-between selection:bg-rose-600 selection:text-white">
+
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50 px-4 py-3">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-gradient-to-tr from-red-600 to-rose-500 rounded-xl shadow-lg shadow-rose-950/50">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight flex items-center gap-2">
+                        ROS2 Embedded Quest
+                        <span class="text-xs font-mono bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2 py-0.5 rounded-full">SMK TEI Edition</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Modul Praktikum: Modul Sistem Embedded & Robotika Industri</p>
+                </div>
+            </div>
+
+            <!-- Score and Level Bar -->
+            <div class="flex items-center gap-6">
+                <div class="hidden sm:flex flex-col items-end">
+                    <span class="text-xs text-slate-400 font-medium">Status AGV Robot</span>
+                    <span id="agv-status-badge" class="text-xs font-semibold text-amber-400 flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span> Belum Terkonfigurasi
+                    </span>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-700/60 rounded-xl px-4 py-1.5 flex items-center gap-4">
+                    <div>
+                        <div class="text-[10px] text-slate-400 uppercase font-semibold">XP Nilai</div>
+                        <div id="player-score" class="font-mono font-bold text-emerald-400 text-base">0 XP</div>
+                    </div>
+                    <div class="w-px h-6 bg-slate-700"></div>
+                    <div>
+                        <div class="text-[10px] text-slate-400 uppercase font-semibold">Selesai</div>
+                        <div id="progress-percent" class="font-mono font-bold text-sky-400 text-base">0%</div>
+                    </div>
+                </div>
+
+                <!-- Sound FX Toggle -->
+                <button id="sound-btn" onclick="toggleAudio()" class="p-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-300 transition-colors" title="Toggle Sound FX">
+                    <svg id="sound-icon-on" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                    </svg>
+                    <svg id="sound-icon-off" class="w-5 h-5 hidden text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl w-full mx-auto p-4 md:p-6 flex-1 flex flex-col gap-6">
+
+        <!-- Stage Navigation Stepper -->
+        <nav class="bg-slate-900/60 border border-slate-800 rounded-2xl p-3 md:p-4 shadow-xl">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-2" id="stepper-container">
+                <!-- Dynamically populated steps -->
+            </div>
+        </nav>
+
+        <!-- Main Interactive Workspace Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+
+            <!-- Left Panel: Instruction & Analogi TEI (5 cols) -->
+            <div class="lg:col-span-5 flex flex-col gap-5">
+                
+                <!-- Robot Visualizer & Live Simulation Card -->
+                <div class="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col items-center relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-r from-rose-500/5 via-sky-500/5 to-emerald-500/5 pointer-events-none"></div>
+                    
+                    <!-- Header Bar Sim -->
+                    <div class="w-full flex justify-between items-center mb-2 z-10">
+                        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <span id="sim-status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span> 
+                            Simulasi Live AGV (Gudang Industri)
+                        </span>
+                        <span id="ros-distro-tag" class="text-[10px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">ROS 2 Humble</span>
+                    </div>
+
+                    <!-- Live Canvas Container -->
+                    <div class="w-full h-56 bg-slate-950 border border-slate-800 rounded-xl relative flex flex-col items-center justify-center overflow-hidden group">
+                        <canvas id="sim-canvas" width="460" height="220" class="w-full h-full object-cover rounded-xl cursor-crosshair"></canvas>
+                        
+                        <!-- Telemetry Overlay Grid -->
+                        <div class="absolute top-2 left-2 pointer-events-none flex flex-col gap-1 font-mono text-[9px] bg-slate-950/80 p-2 rounded-lg border border-slate-800 backdrop-blur-sm">
+                            <div class="text-emerald-400 font-bold flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> TOPIC: /cmd_vel
+                            </div>
+                            <div id="telemetry-cmd" class="text-slate-300">v: 0.00 m/s | w: 0.00 rad/s</div>
+                            <div class="text-sky-400 font-bold flex items-center gap-1 mt-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span> TOPIC: /scan (LiDAR)
+                            </div>
+                            <div id="telemetry-scan" class="text-slate-300">Min Obstacle: -- cm</div>
+                        </div>
+
+                        <!-- Live Teleop D-Pad Overlay (Mobile / Quick Touch) -->
+                        <div class="absolute bottom-2 right-2 flex flex-col items-center gap-1 bg-slate-900/80 p-1.5 rounded-xl border border-slate-800 backdrop-blur-sm z-20">
+                            <button onmousedown="startTeleop('up')" onmouseup="stopTeleop()" ontouchstart="startTeleop('up')" ontouchend="stopTeleop()" class="w-7 h-7 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold active:bg-emerald-600 transition-colors">▲</button>
+                            <div class="flex gap-1">
+                                <button onmousedown="startTeleop('left')" onmouseup="stopTeleop()" ontouchstart="startTeleop('left')" ontouchend="stopTeleop()" class="w-7 h-7 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold active:bg-emerald-600 transition-colors">◄</button>
+                                <button onmousedown="startTeleop('down')" onmouseup="stopTeleop()" ontouchstart="startTeleop('down')" ontouchend="stopTeleop()" class="w-7 h-7 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold active:bg-emerald-600 transition-colors">▼</button>
+                                <button onmousedown="startTeleop('right')" onmouseup="stopTeleop()" ontouchstart="startTeleop('right')" ontouchend="stopTeleop()" class="w-7 h-7 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold active:bg-emerald-600 transition-colors">►</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Simulator Controls & Mode Switcher -->
+                    <div class="w-full mt-2.5 flex items-center justify-between gap-2 text-xs font-mono">
+                        <div class="flex items-center gap-1.5">
+                            <button id="btn-mode-auto" onclick="toggleAutoDrive()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-lg transition-all flex items-center gap-1">
+                                <span class="w-2 h-2 rounded-full bg-slate-500" id="auto-mode-dot"></span>
+                                <span id="auto-mode-label">Mode Auto: Off</span>
+                            </button>
+                            <button onclick="toggleLidarView()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-lg transition-all">
+                                LiDAR Visual: <span id="lidar-status-text" class="text-emerald-400">ON</span>
+                            </button>
+                        </div>
+                        <button onclick="resetRobotPos()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 rounded-lg" title="Reset Posisi Robot">
+                            🔄 Reset
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span id="stage-badge" class="bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-mono font-bold px-2.5 py-1 rounded-lg">
+                                Tahap 1 dari 5
+                            </span>
+                            <h2 id="stage-title" class="font-bold text-lg text-white">Persiapan Locale Ubuntu Server</h2>
+                        </div>
+
+                        <p id="stage-description" class="text-sm text-slate-300 leading-relaxed mb-4">
+                            Sebelum memasang ROS 2 di Ubuntu Server, kita harus memastikan sistem mendukung encode karakter UTF-8. Jika locale tidak dikonfigurasi, ROS 2 bisa mengalami error komunikasi data!
+                        </p>
+
+                        <!-- TEI Analogy Box -->
+                        <div class="bg-slate-950/80 border-l-4 border-amber-500 rounded-r-xl p-3.5 mb-4">
+                            <div class="text-xs font-bold text-amber-400 uppercase tracking-wide flex items-center gap-1.5 mb-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                Analogi Teknik Elektronika:
+                            </div>
+                            <p id="stage-analogy" class="text-xs text-slate-300 italic">
+                                Sederhananya, Locale itu seperti menyamakan Baud Rate dan Protokol Bahasa pada komunikasi Serial RS232 / UART. Jika bahasa sistem berbeda, data sensor bisa corrupt!
+                            </p>
+                        </div>
+
+                        <!-- Objective & Helper -->
+                        <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3.5">
+                            <div class="text-xs font-semibold text-sky-400 mb-1 flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                Tugas Praktikum Kamu:
+                            </div>
+                            <p id="stage-task" class="text-xs text-slate-300 font-mono">
+                                Eksekusi perintah setup locale di terminal sebelah kanan.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Hint & Action Buttons -->
+                    <div class="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center">
+                        <button onclick="showHint()" class="text-xs text-slate-400 hover:text-amber-400 flex items-center gap-1 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                            Butuh Petunjuk Guru?
+                        </button>
+
+                        <button id="next-stage-btn" onclick="nextStage()" disabled class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-lg transition-all flex items-center gap-2">
+                            Lanjut Ke Tahap Berikutnya
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-7 flex flex-col gap-4">
+                
+                <!-- Terminal Window -->
+                <div class="bg-ros-terminal border border-ros-border rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[480px] relative terminal-glow">
+                    
+                    <!-- Terminal Header Bar -->
+                    <div class="bg-slate-900 border-b border-ros-border px-4 py-2.5 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
+                            <span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
+                            <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
+                            <span class="ml-2 text-xs font-mono text-slate-400 flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                ubuntu@agv-industrial-server:~
+                            </span>
+                        </div>
+                        <div class="text-[10px] font-mono text-slate-500">SSH Active (Port 22)</div>
+                    </div>
+
+                    <!-- Terminal Output Screen -->
+                    <div id="terminal-screen" class="p-4 font-mono text-xs overflow-y-auto flex-1 flex flex-col gap-2 leading-relaxed selection:bg-emerald-900/80">
+                        <div class="text-slate-500">Welcome to Ubuntu 22.04.3 LTS (GNU/Linux 5.15.0-88-generic x86_64)</div>
+                        <div class="text-slate-500">System architecture: ARM64 / x86_64 Industrial Board</div>
+                        <div class="text-slate-500">Type or click command buttons below to configure ROS 2.</div>
+                        <div class="text-slate-600">----------------------------------------------------</div>
+                    </div>
+
+                    <!-- Interactive Command Input Prompt -->
+                    <div class="bg-slate-950/90 border-t border-ros-border p-3 flex items-center gap-2">
+                        <span class="font-mono text-xs text-emerald-400 font-bold flex items-center gap-1">
+                            <span>ubuntu@agv:~$</span>
+                        </span>
+                        <input type="text" id="terminal-input" autocomplete="off" spellcheck="false" placeholder="Ketik perintah di sini atau gunakan blok pilihan di bawah..." 
+                            class="flex-1 bg-transparent font-mono text-xs text-white focus:outline-none placeholder:text-slate-600"
+                            onkeydown="handleTerminalKeyPress(event)">
+                        <button onclick="submitTerminalInput()" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold rounded-lg transition-colors">
+                            RUN
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Interactive Command Helper / Drag-and-Select Palette -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg">
+                    <div class="text-xs font-bold text-slate-300 mb-2.5 flex items-center justify-between">
+                        <span class="flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            Blok Perintah Cepat (Klik untuk Mengisi Input):
+                        </span>
+                        <span class="text-[10px] text-slate-500">Bisa diketik manual juga</span>
+                    </div>
+
+                    <div id="command-palette" class="flex flex-wrap gap-2">
+                        <!-- Dynamically filled command buttons for current level -->
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <footer class="border-t border-slate-800 bg-slate-900/50 py-3 px-4 text-center text-xs text-slate-500">
+        <p>ROS 2 Educational Simulator for SMK Teknik Elektronika Industri &copy; 2026 - Dilengkapi Modul ROS 2 Humble Hawksbill</p>
+    </footer>
+
+    <!-- Hint Modal Box -->
+    <div id="hint-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+            <div class="flex items-center gap-3 text-amber-400 font-bold text-base mb-3">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                Petunjuk Guru (Bantuan Praktikum)
+            </div>
+            <p id="hint-modal-text" class="text-sm text-slate-300 leading-relaxed mb-6 font-mono bg-slate-950 p-3 rounded-xl border border-slate-800">
+                Gunakan perintah `locale` terlebih dahulu.
+            </p>
+            <div class="flex justify-end">
+                <button onclick="closeHint()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs rounded-xl transition-colors">
+                    Saya Mengerti
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Final Certificate & Quiz Modal -->
+    <div id="completion-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-emerald-500/40 rounded-3xl max-w-2xl w-full p-6 md:p-8 shadow-2xl text-center relative overflow-hidden">
+            <div class="absolute -top-12 -right-12 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div class="w-16 h-16 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-lg shadow-emerald-950/50">
+                <svg class="w-8 h-8 text-slate-950" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            </div>
+
+            <h2 class="text-2xl font-extrabold text-white mb-2">Selamat! Instalasi ROS 2 Berhasil!</h2>
+            <p class="text-sm text-slate-300 max-w-md mx-auto mb-6">
+                Sistem Embedded AGV Robot milikmu kini resmi siap menjalankan modul Autonomy, Sensor Fusion, dan Control Loop menggunakan ROS 2 Humble.
+            </p>
+
+            <!-- Certificate Summary Box -->
+            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-6 text-left font-mono text-xs space-y-2">
+                <div class="flex justify-between border-b border-slate-800 pb-2">
+                    <span class="text-slate-400">Siswa TEI:</span>
+                    <span class="text-emerald-400 font-bold">Teknisi Embedded ROS 2</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-800 pb-2">
+                    <span class="text-slate-400">Total Skor XP:</span>
+                    <span id="final-score" class="text-amber-400 font-bold">500 XP</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Status Node Comunicator:</span>
+                    <span class="text-sky-400 font-bold">TALKER & LISTENER ACTIVE</span>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap justify-center gap-3">
+                <button onclick="resetGame()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-colors">
+                    Ulangi Praktikum
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let audioCtx = null;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            initAudio();
+            if (!audioCtx) return;
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'key') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            } else if (type === 'success') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.2);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.setValueAtTime(120, now + 0.1);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'level') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            }
+        }
+
+        function toggleAudio() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-icon-on').classList.toggle('hidden', !soundEnabled);
+            document.getElementById('sound-icon-off').classList.toggle('hidden', soundEnabled);
+        }
+
+        const gameStages = [
+            {
+                id: 1,
+                badge: "Tahap 1 dari 5",
+                title: "Persiapan Locale UTF-8",
+                description: "Langkah awal sebelum menginstal ROS 2 di Ubuntu Server adalah menyetting locale ke UTF-8. Hal ini memastikan terminal dan parser ROS 2 tidak bermasalah saat memproses string data sensor.",
+                analogy: "Sama seperti mengatur Baud Rate & Format Data (8N1) pada komunikasi serial UART mikrokontroler ESP32/STM32 agar tidak 'Garbage Text'.",
+                task: "Jalankan perintah untuk memeriksa & menggenerasi Locale en_US.UTF-8.",
+                hint: "Urutan perintah: 1. Cek locale (`locale`), 2. Update apt (`sudo apt update && sudo apt install locales`), 3. Generasi locale (`sudo locale-gen en_US en_US.UTF-8`).",
+                requiredCommands: [
+                    "locale",
+                    "sudo apt update && sudo apt install -y locales",
+                    "sudo locale-gen en_US en_US.UTF-8"
+                ],
+                palette: [
+                    "locale",
+                    "sudo apt update && sudo apt install -y locales",
+                    "sudo locale-gen en_US en_US.UTF-8",
+                    "sudo reboot"
+                ],
+                expectedOutputs: [
+                    "LANG=en_US.UTF-8\nLC_ALL=en_US.UTF-8",
+                    "Get:1 http://archive.ubuntu.com/ubuntu jammy InRelease\nReading package lists... Done\nlocales is already the newest version.",
+                    "Generating locales (this might take a while)...\n  en_US.UTF-8... done\nGeneration complete."
+                ],
+                robotStatus: "Configuring Locale...",
+                robotProgress: "20%"
+            },
+            {
+                id: 2,
+                badge: "Tahap 2 dari 5",
+                title: "Setup Repositori & Kunci GPG",
+                description: "Ubuntu Server bawaan belum memiliki daftar repositori khusus paket ROS 2. Kita perlu menambahkan Kunci Keamanan (GPG Key) dan alamat server ROS 2 ke Ubuntu Apt Source.",
+                analogy: "Ibarat menambahkan 'Sertifikat Otentikasi' pada sistem RFID/Smart Card. GPG Key memastikan software yang diunduh asli & aman dari tamper.",
+                task: "Tambahkan kunci GPG ROS 2 dan masukkan repository ROS 2 ke `/etc/apt/sources.list.d/ros2.list`.",
+                hint: "Jalankan `sudo apt install software-properties-common`, kemudian unduh kunci gpg dengan `curl`, lalu tambahkan repositori ROS2.",
+                requiredCommands: [
+                    "sudo apt install -y software-properties-common",
+                    "sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg",
+                    "echo \"deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main\" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null"
+                ],
+                palette: [
+                    "sudo apt install -y software-properties-common",
+                    "sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg",
+                    "echo \"deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main\" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null",
+                    "sudo apt update"
+                ],
+                expectedOutputs: [
+                    "software-properties-common installed successfully.",
+                    "GPG Key saved to /usr/share/keyrings/ros-archive-keyring.gpg [OK]",
+                    "Repository added to /etc/apt/sources.list.d/ros2.list successfully."
+                ],
+                robotStatus: "GPG Key Verified!",
+                robotProgress: "40%"
+            },
+            {
+                id: 3,
+                badge: "Tahap 3 dari 5",
+                title: "Instalasi Paket Utama ROS 2",
+                description: "Pada Ubuntu Server di komputer embedded (seperti Raspberry Pi atau Jetson Nano), kita memasang varian `ros-humble-ros-base` (tanpa GUI/RViz) untuk menghemat memori RAM & penyimpanan SD Card.",
+                analogy: "Sama seperti memprogram Microcontroller tanpa library visual grafik berat agar siklus CPU fokus pada pengolahan sensor cepat (Real-time).",
+                task: "Lakukan `sudo apt update` terlebih dahulu, lalu install `ros-humble-ros-base`.",
+                hint: "1. `sudo apt update`, 2. `sudo apt install -y ros-humble-ros-base`.",
+                requiredCommands: [
+                    "sudo apt update",
+                    "sudo apt install -y ros-humble-ros-base"
+                ],
+                palette: [
+                    "sudo apt update",
+                    "sudo apt install -y ros-humble-ros-base",
+                    "sudo apt install -y ros-humble-desktop",
+                    "ros2 doctor"
+                ],
+                expectedOutputs: [
+                    "Hit:1 http://packages.ros.org/ros2/ubuntu jammy InRelease\nReading package lists... Done",
+                    "Unpacking ros-humble-ros-base (0.10.0-1jammy)...\nSetting up ROS 2 Humble Base Packages...\nProcessing triggers for libc-bin..."
+                ],
+                robotStatus: "Core ROS2 Installed!",
+                robotProgress: "60%"
+            },
+            {
+                id: 4,
+                badge: "Tahap 4 dari 5",
+                title: "Environment Sourcing & Auto-Load",
+                description: "Agar perintah `ros2` dapat dikenali oleh Terminal Linux, kita harus me-'source' file setup script `/opt/ros/humble/setup.bash`. Supaya otomatis setiap kali boot, kita masukkan ke file `~/.bashrc`.",
+                analogy: "Ibarat menuliskan `#include <ROS2.h>` di header program C++ agar semua fungsi library robot terdeteksi oleh compiler.",
+                task: "Source environment ROS 2 dan masukkan script sourcing ke file `~/.bashrc`.",
+                hint: "Gunakan `source /opt/ros/humble/setup.bash` dan `echo \"source /opt/ros/humble/setup.bash\" >> ~/.bashrc`.",
+                requiredCommands: [
+                    "source /opt/ros/humble/setup.bash",
+                    "echo \"source /opt/ros/humble/setup.bash\" >> ~/.bashrc"
+                ],
+                palette: [
+                    "source /opt/ros/humble/setup.bash",
+                    "echo \"source /opt/ros/humble/setup.bash\" >> ~/.bashrc",
+                    "cat ~/.bashrc",
+                    "ros2 node list"
+                ],
+                expectedOutputs: [
+                    "ROS_DISTRO set to 'humble'\nROS_VERSION set to '2'",
+                    "Appended setup.bash to ~/.bashrc for automatic sourcing."
+                ],
+                robotStatus: "Environment Sourced!",
+                robotProgress: "80%"
+            },
+            {
+                id: 5,
+                badge: "Tahap 5 dari 5",
+                title: "Pengujian Komunikasi Node (Talker & Listener)",
+                description: "Arsitektur ROS 2 berfokus pada Node. Kita akan menguji apakah sistem penterjemah pesan Publish-Subscribe bekerja dengan menjalankan C++ Talker & Python Listener.",
+                analogy: "Sama seperti modul Transmitter (TX) mengirimkan sinyal radio/telemetri dan Receiver (RX) menerima paket data kecepatan roda AGV.",
+                task: "Jalankan node pengujian C++ demo talker untuk verifikasi.",
+                hint: "Jalankan `ros2 run demo_nodes_cpp talker`.",
+                requiredCommands: [
+                    "ros2 run demo_nodes_cpp talker"
+                ],
+                palette: [
+                    "ros2 run demo_nodes_cpp talker",
+                    "ros2 run demo_nodes_py listener",
+                    "ros2 topic list",
+                    "ros2 node list"
+                ],
+                expectedOutputs: [
+                    "[INFO] [171190000.102] [talker]: Publishing: 'Hello World: 1'\n[INFO] [171190001.102] [talker]: Publishing: 'Hello World: 2'\n[INFO] [171190002.102] [talker]: Publishing: 'Hello World: 3'\n--> ROS2 DDS Communication Success!"
+                ],
+                robotStatus: "AGV Robot Online & Fully Ready!",
+                robotProgress: "100%"
+            }
+        ];
+
+        let currentStageIndex = 0;
+        let completedStepsInStage = [];
+        let score = 0;
+
+        // ==========================================
+        // LIVE AGV ROBOT 2D SIMULATOR ENGINE
+        // ==========================================
+        const simCanvas = document.getElementById('sim-canvas');
+        const ctx = simCanvas ? simCanvas.getContext('2d') : null;
+
+        let autoNavActive = false;
+        let showLidarRays = true;
+        let activeKeyTeleop = null;
+
+        // Robot State
+        const agv = {
+            x: 80,
+            y: 110,
+            radius: 18,
+            angle: 0, // in radians
+            speed: 0,
+            maxSpeed: 2.2,
+            angularSpeed: 0,
+            color: '#38bdf8',
+            lidarRange: 90,
+            lidarRaysCount: 24,
+            closestObstacleDist: 999,
+            statusText: "DISCONNECTED",
+            statusColor: "#f59e0b"
+        };
+
+        // Industrial Warehouse Obstacles (Walls & Cargo Crates)
+        const obstacles = [
+            { x: 180, y: 30, w: 25, h: 70, label: "CRATE-A" },
+            { x: 260, y: 120, w: 30, h: 75, label: "CRATE-B" },
+            { x: 370, y: 40, w: 20, h: 80, label: "PALLET" },
+            { x: 100, y: 160, w: 90, h: 20, label: "CONVEYOR" },
+            // Outer Arena Borders
+            { x: 0, y: 0, w: 460, h: 6 },
+            { x: 0, y: 214, w: 460, h: 6 },
+            { x: 0, y: 0, w: 6, h: 220 },
+            { x: 454, y: 0, w: 6, h: 220 }
+        ];
+
+        function toggleAutoDrive() {
+            if (currentStageIndex < 2) {
+                appendTerminalOutput("[SIMULATOR]: Mode Navigasi Otonom terkunci! Selesaikan instalasi ROS2 Base terlebih dahulu.", "text-amber-400 font-bold");
+                return;
+            }
+            autoNavActive = !autoNavActive;
+            const btnLabel = document.getElementById('auto-mode-label');
+            const btnDot = document.getElementById('auto-mode-dot');
+            if (autoNavActive) {
+                btnLabel.innerText = "Mode Auto: ON (ROS2 Nav)";
+                btnDot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-ping";
+                appendTerminalOutput("[ROS2 NODE]: Autonomous Obstacle Avoidance Node started. Publishing to /cmd_vel", "text-emerald-400 font-mono");
+            } else {
+                btnLabel.innerText = "Mode Auto: Off";
+                btnDot.className = "w-2 h-2 rounded-full bg-slate-500";
+                agv.speed = 0;
+                agv.angularSpeed = 0;
+            }
+        }
+
+        function toggleLidarView() {
+            showLidarRays = !showLidarRays;
+            document.getElementById('lidar-status-text').innerText = showLidarRays ? "ON" : "OFF";
+            document.getElementById('lidar-status-text').className = showLidarRays ? "text-emerald-400" : "text-slate-500";
+        }
+
+        function resetRobotPos() {
+            agv.x = 80;
+            agv.y = 110;
+            agv.angle = 0;
+            agv.speed = 0;
+            agv.angularSpeed = 0;
+        }
+
+        function startTeleop(direction) {
+            activeKeyTeleop = direction;
+        }
+
+        function stopTeleop() {
+            activeKeyTeleop = null;
+            if (!autoNavActive) {
+                agv.speed = 0;
+                agv.angularSpeed = 0;
+            }
+        }
+
+        // Keyboard Controls Handler
+        window.addEventListener('keydown', (e) => {
+            if (document.activeElement.tagName === 'INPUT') return; // Don't trigger when typing in terminal
+            if (['ArrowUp', 'KeyW'].includes(e.code)) startTeleop('up');
+            if (['ArrowDown', 'KeyS'].includes(e.code)) startTeleop('down');
+            if (['ArrowLeft', 'KeyA'].includes(e.code)) startTeleop('left');
+            if (['ArrowRight', 'KeyD'].includes(e.code)) startTeleop('right');
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyS', 'KeyA', 'KeyD'].includes(e.code)) {
+                stopTeleop();
+            }
+        });
+
+        function calculateLidarScan() {
+            let minDistance = 999;
+            const rayAngles = [];
+            const rayHits = [];
+
+            const step = (Math.PI * 2) / agv.lidarRaysCount;
+            for (let i = 0; i < agv.lidarRaysCount; i++) {
+                const angle = agv.angle + i * step;
+                let hitDist = agv.lidarRange;
+
+                // Cast ray incrementally
+                for (let r = 0; r < agv.lidarRange; r += 4) {
+                    const rx = agv.x + Math.cos(angle) * r;
+                    const ry = agv.y + Math.sin(angle) * r;
+
+                    // Check collision with obstacles
+                    let hit = false;
+                    for (const obs of obstacles) {
+                        if (rx >= obs.x && rx <= obs.x + obs.w && ry >= obs.y && ry <= obs.y + obs.h) {
+                            hitDist = r;
+                            hit = true;
+                            break;
+                        }
+                    }
+                    if (hit) break;
+                }
+
+                if (hitDist < minDistance) minDistance = hitDist;
+                rayHits.push({ angle, dist: hitDist });
+            }
+
+            agv.closestObstacleDist = Math.round(minDistance);
+            return rayHits;
+        }
+
+        function updateRobotPhysics() {
+            // Stage Unlocks Influence Physics
+            if (currentStageIndex === 0) {
+                agv.statusText = "OFFLINE (No Locale)";
+                agv.statusColor = "#ef4444";
+            } else if (currentStageIndex === 1) {
+                agv.statusText = "GPG KEY VERIFIED";
+                agv.statusColor = "#f59e0b";
+            } else if (currentStageIndex === 2) {
+                agv.statusText = "ROS2 BASE INSTALLED";
+                agv.statusColor = "#38bdf8";
+            } else if (currentStageIndex >= 3) {
+                agv.statusText = "NODE ACTIVE (Talker/Listener)";
+                agv.statusColor = "#10b981";
+            }
+
+            // Handle Manual Teleop Inputs
+            if (activeKeyTeleop && !autoNavActive) {
+                if (activeKeyTeleop === 'up') agv.speed = agv.maxSpeed;
+                if (activeKeyTeleop === 'down') agv.speed = -agv.maxSpeed * 0.6;
+                if (activeKeyTeleop === 'left') agv.angularSpeed = -0.07;
+                if (activeKeyTeleop === 'right') agv.angularSpeed = 0.07;
+            }
+
+            // Handle Autonomous Obstacle Avoidance (Simulated ROS 2 Nav Node)
+            if (autoNavActive) {
+                if (agv.closestObstacleDist < 35) {
+                    // Turn away from obstacle
+                    agv.speed = 0.3;
+                    agv.angularSpeed = 0.09;
+                } else {
+                    // Drive forward
+                    agv.speed = 1.4;
+                    agv.angularSpeed = (Math.random() - 0.5) * 0.02; // Minor drift simulation
+                }
+            }
+
+            // Apply movement
+            agv.angle += agv.angularSpeed;
+            const nextX = agv.x + Math.cos(agv.angle) * agv.speed;
+            const nextY = agv.y + Math.sin(agv.angle) * agv.speed;
+
+            // Simple Collision Detection with obstacles for robot chassis
+            let collided = false;
+            for (const obs of obstacles) {
+                if (nextX + agv.radius > obs.x && nextX - agv.radius < obs.x + obs.w &&
+                    nextY + agv.radius > obs.y && nextY - agv.radius < obs.y + obs.h) {
+                    collided = true;
+                    break;
+                }
+            }
+
+            if (!collided) {
+                agv.x = nextX;
+                agv.y = nextY;
+            } else {
+                agv.speed = 0; // Stop on bump
+            }
+
+            // Update Telemetry Display
+            const cmdEl = document.getElementById('telemetry-cmd');
+            const scanEl = document.getElementById('telemetry-scan');
+            if (cmdEl) cmdEl.innerText = `v: ${agv.speed.toFixed(2)} m/s | w: ${agv.angularSpeed.toFixed(2)} rad/s`;
+            if (scanEl) scanEl.innerText = `Min Obstacle: ${agv.closestObstacleDist} cm`;
+
+            const simDot = document.getElementById('sim-status-dot');
+            if (simDot) simDot.style.backgroundColor = agv.statusColor;
+        }
+
+        function drawSimulation() {
+            if (!ctx) return;
+
+            // Clear Background
+            ctx.fillStyle = '#090d16';
+            ctx.fillRect(0, 0, simCanvas.width, simCanvas.height);
+
+            // Draw Grid Lines
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < simCanvas.width; x += 20) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, simCanvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < simCanvas.height; y += 20) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(simCanvas.width, y);
+                ctx.stroke();
+            }
+
+            // Draw Industrial Obstacles
+            obstacles.forEach(obs => {
+                ctx.fillStyle = '#1e293b';
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 1.5;
+                ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+
+                if (obs.label) {
+                    ctx.fillStyle = '#64748b';
+                    ctx.font = '8px monospace';
+                    ctx.fillText(obs.label, obs.x + 2, obs.y + 10);
+                }
+            });
+
+            // Calculate & Draw LiDAR Rays
+            const rays = calculateLidarScan();
+            if (showLidarRays) {
+                rays.forEach(ray => {
+                    const rx = agv.x + Math.cos(ray.angle) * ray.dist;
+                    const ry = agv.y + Math.sin(ray.angle) * ray.dist;
+
+                    ctx.beginPath();
+                    ctx.moveTo(agv.x, agv.y);
+                    ctx.lineTo(rx, ry);
+                    ctx.strokeStyle = ray.dist < 35 ? 'rgba(244, 63, 94, 0.6)' : 'rgba(34, 197, 94, 0.25)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    // Hit point dot
+                    ctx.fillStyle = ray.dist < 35 ? '#f43f5e' : '#22c55e';
+                    ctx.fillRect(rx - 1, ry - 1, 2, 2);
+                });
+            }
+
+            // Draw AGV Robot Body
+            ctx.save();
+            ctx.translate(agv.x, agv.y);
+            ctx.rotate(agv.angle);
+
+            // Differential Drive Wheels
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(-12, -agv.radius - 3, 10, 5);
+            ctx.fillRect(-12, agv.radius - 2, 10, 5);
+
+            // Chassis Circle / Rounded Rect
+            ctx.fillStyle = '#1e293b';
+            ctx.strokeStyle = agv.statusColor;
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, agv.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Lidar Turret at center
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(0, 0, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.stroke();
+
+            // Heading Arrow / Front Light
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc(10, 0, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+
+            // Draw Robot Status Badge Above AGV
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '9px Plus Jakarta Sans, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`AGV [${agv.statusText}]`, agv.x, agv.y - agv.radius - 6);
+        }
+
+        // Live Simulation Animation Loop
+        function simLoop() {
+            updateRobotPhysics();
+            drawSimulation();
+            requestAnimationFrame(simLoop);
+        }
+
+        function initGame() {
+            renderStepper();
+            loadStage(0);
+            // Start simulation loop
+            requestAnimationFrame(simLoop);
+        }
+
+        function renderStepper() {
+            const container = document.getElementById('stepper-container');
+            container.innerHTML = '';
+
+            gameStages.forEach((stage, idx) => {
+                const stepEl = document.createElement('div');
+                stepEl.className = `p-2 rounded-xl border flex items-center gap-2 transition-all ${
+                    idx === currentStageIndex 
+                    ? 'bg-rose-500/10 border-rose-500/50 text-white' 
+                    : idx < currentStageIndex 
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-400' 
+                    : 'bg-slate-950/40 border-slate-800 text-slate-500'
+                }`;
+
+                stepEl.innerHTML = `
+                    <div class="w-6 h-6 rounded-lg text-xs font-mono font-bold flex items-center justify-center shrink-0 ${
+                        idx < currentStageIndex ? 'bg-emerald-500 text-slate-950' : idx === currentStageIndex ? 'bg-rose-500 text-white' : 'bg-slate-800 text-slate-400'
+                    }">
+                        ${idx < currentStageIndex ? '✓' : idx + 1}
+                    </div>
+                    <div class="truncate text-xs font-semibold">
+                        <div class="truncate">${stage.title}</div>
+                    </div>
+                `;
+                container.appendChild(stepEl);
+            });
+        }
+
+        function loadStage(index) {
+            currentStageIndex = index;
+            completedStepsInStage = [];
+            const stage = gameStages[index];
+
+            document.getElementById('stage-badge').innerText = stage.badge;
+            document.getElementById('stage-title').innerText = stage.title;
+            document.getElementById('stage-description').innerText = stage.description;
+            document.getElementById('stage-analogy').innerText = stage.analogy;
+            document.getElementById('stage-task').innerText = stage.task;
+
+            document.getElementById('next-stage-btn').disabled = true;
+
+            // Render Palette
+            const paletteContainer = document.getElementById('command-palette');
+            paletteContainer.innerHTML = '';
+            stage.palette.forEach(cmd => {
+                const btn = document.createElement('button');
+                btn.className = "px-3 py-1.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 rounded-lg text-xs font-mono text-emerald-300 transition-colors text-left flex items-center gap-2";
+                btn.onclick = () => {
+                    document.getElementById('terminal-input').value = cmd;
+                    playSound('key');
+                };
+                btn.innerHTML = `<span class="text-rose-400 font-bold">$</span> <span>${cmd}</span>`;
+                paletteContainer.appendChild(btn);
+            });
+
+            // Add Stage Header to Terminal
+            appendTerminalOutput(`--- Memulai Tahap ${stage.id}: ${stage.title} ---`, 'text-amber-400 font-bold mt-2');
+            renderStepper();
+        }
+
+        function appendTerminalOutput(text, customClass = 'text-slate-300') {
+            const screen = document.getElementById('terminal-screen');
+            const line = document.createElement('div');
+            line.className = customClass;
+            line.innerText = text;
+            screen.appendChild(line);
+            screen.scrollTop = screen.scrollHeight;
+        }
+
+        function handleTerminalKeyPress(event) {
+            if (event.key === 'Enter') {
+                submitTerminalInput();
+            } else {
+                playSound('key');
+            }
+        }
+
+        function submitTerminalInput() {
+            const inputEl = document.getElementById('terminal-input');
+            const rawCmd = inputEl.value.trim();
+            if (!rawCmd) return;
+
+            appendTerminalOutput(`ubuntu@agv:~$ ${rawCmd}`, 'text-emerald-400 font-bold');
+            inputEl.value = '';
+
+            const stage = gameStages[currentStageIndex];
+            const targetStepIndex = completedStepsInStage.length;
+            const expectedCmd = stage.requiredCommands[targetStepIndex];
+
+            if (rawCmd === expectedCmd) {
+                // Correct Command
+                playSound('success');
+                const output = stage.expectedOutputs[targetStepIndex];
+                appendTerminalOutput(output, 'text-slate-300 font-mono whitespace-pre-wrap');
+
+                completedStepsInStage.push(rawCmd);
+                score += 100;
+                updateScoreUI();
+
+                if (completedStepsInStage.length === stage.requiredCommands.length) {
+                    // Stage Complete!
+                    playSound('level');
+                    appendTerminalOutput(`[SUCCESS] Tahap ${stage.id} selesai! Silakan klik tombol 'Lanjut Ke Tahap Berikutnya'.`, 'text-emerald-400 font-bold bg-emerald-950/50 p-2 rounded border border-emerald-800 mt-2');
+                    document.getElementById('next-stage-btn').disabled = false;
+                    
+                    // Update AGV Graphic
+                    updateAGVGraphic(stage.id);
+                }
+            } else {
+                // Incorrect Command
+                playSound('error');
+                appendTerminalOutput(`bash: ${rawCmd}: command error atau urutan langkah tidak tepat.`, 'text-rose-400 font-bold');
+                appendTerminalOutput(`[Petunjuk Guru]: Diperlukan -> ${expectedCmd || stage.requiredCommands[0]}`, 'text-amber-400/80 italic');
+            }
+        }
+
+        function updateAGVGraphic(stageId) {
+            const statusBadge = document.getElementById('agv-status-badge');
+
+            if (stageId === 5 && statusBadge) {
+                statusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span> AGV ROS2 Ready`;
+                statusBadge.className = "text-xs font-semibold text-emerald-400 flex items-center gap-1";
+            } else if (stageId >= 2 && statusBadge) {
+                statusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span> Configured (Stage ${stageId})`;
+                statusBadge.className = "text-xs font-semibold text-sky-400 flex items-center gap-1";
+            }
+        }
+
+        function updateScoreUI() {
+            document.getElementById('player-score').innerText = `${score} XP`;
+            const overallPercent = Math.round((score / 1100) * 100);
+            document.getElementById('progress-percent').innerText = `${Math.min(overallPercent, 100)}%`;
+        }
+
+        function nextStage() {
+            if (currentStageIndex < gameStages.length - 1) {
+                loadStage(currentStageIndex + 1);
+            } else {
+                showCompletionModal();
+            }
+        }
+
+        function showHint() {
+            const stage = gameStages[currentStageIndex];
+            document.getElementById('hint-modal-text').innerText = stage.hint;
+            document.getElementById('hint-modal').classList.remove('hidden');
+        }
+
+        function closeHint() {
+            document.getElementById('hint-modal').classList.add('hidden');
+        }
+
+        function showCompletionModal() {
+            playSound('level');
+            document.getElementById('final-score').innerText = `${score} XP`;
+            document.getElementById('completion-modal').classList.remove('hidden');
+        }
+
+        function resetGame() {
+            score = 0;
+            currentStageIndex = 0;
+            updateScoreUI();
+            document.getElementById('completion-modal').classList.add('hidden');
+            document.getElementById('terminal-screen').innerHTML = `
+                <div class="text-slate-500">Welcome to Ubuntu 22.04.3 LTS (GNU/Linux 5.15.0-88-generic x86_64)</div>
+                <div class="text-slate-500">System architecture: ARM64 / x86_64 Industrial Board</div>
+                <div class="text-slate-600">----------------------------------------------------</div>
+            `;
+            initGame();
+        }
+
+        // Initialize on load
+        window.onload = () => {
+            initGame();
+        };
+    </script>
+</body>
+</html>
